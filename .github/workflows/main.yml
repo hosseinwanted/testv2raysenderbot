@@ -2,6 +2,7 @@ name: Send API Data to Telegram
 
 on:
   schedule:
+    # اجرا در ابتدای هر ساعت
     - cron: '0 * * * *'
   workflow_dispatch:
 
@@ -21,11 +22,10 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      # در این بخش، سکرت جدید را هم به env اضافه می‌کنیم
       - name: Run script
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-          NAVASAN_API_KEYS: ${{ secrets.NAVASAN_API_KEYS }} # <--- این خط اضافه شد
+          BRS_API_KEY: ${{ secrets.BRS_API_KEY }} # خواندن سکرت صحیح
 
         run: python main.py
