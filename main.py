@@ -21,7 +21,7 @@ TELEGRAM_PROXY_CHANNEL_URL = "https://t.me/YourTelegramProxyChannel"
 V2RAY_CHANNEL_URL = "https://t.me/YourV2rayChannel"
 
 def get_prices_from_api():
-    """قیمت‌ها را از API جدید Navasan با استفاده از یک کلید تصادفی می‌خواند."""
+    """قیمت‌ها را می‌خواند و کل پاسخ JSON را برای اشکال‌یابی چاپ می‌کند."""
     try:
         if not API_KEYS:
             raise ValueError("NAVASAN_API_KEYS secret is not set or is empty.")
@@ -35,10 +35,18 @@ def get_prices_from_api():
         
         data = response.json()
         
+        # --- بخش کلیدی اشکال‌یابی ---
+        # چاپ کردن کل ساختار JSON دریافتی به صورت خوانا
+        print("\n--- FULL JSON RESPONSE FROM API ---")
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+        print("--- END OF JSON RESPONSE ---\n")
+        # --- پایان بخش اشکال‌یابی ---
+        
+        # کد استخراج مثل قبل باقی می‌ماند
         prices = {
             'usd': data.get('usd_sell', {}).get('value', 'N/A'),
             'eur': data.get('eur', {}).get('value', 'N/A'),
-            'sekeh': data.get('sekkeh', {}).get('value', 'N/A')
+            'sekeh': data.get('sekkeh', {}).get('value', 'N/A') # این خط احتمالاً اشتباه است
         }
         
         print(f"Prices fetched successfully: {prices}")
