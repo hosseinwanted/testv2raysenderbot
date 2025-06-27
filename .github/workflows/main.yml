@@ -1,4 +1,4 @@
-name: Send Single Proxy to Telegram
+name: Send Smart-Random Proxy to Telegram
 
 on:
   schedule:
@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
-    # --- این بخش کلیدی، مشکل دسترسی را حل می‌کند ---
+    # دسترسی نوشتن برای ذخیره فایل حافظه ضروری است
     permissions:
       contents: write
 
@@ -28,21 +28,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Run the script to send one proxy
+      - name: Run the script to send one smart-random proxy
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python main.py
         
-      - name: Commit state file
+      - name: Commit recent proxies file
         run: |
-          # Check if state.txt exists before trying to add it
-          if [ -f state.txt ]; then
+          # بررسی کن که آیا فایل حافظه وجود دارد یا خیر
+          if [ -f recent_proxies.txt ]; then
             git config --global user.name 'github-actions[bot]'
             git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-            git add state.txt
-            git diff --staged --quiet || (git commit -m "Update proxy state" && git push)
+            git add recent_proxies.txt
+            # فقط در صورتی کامیت کن که تغییری در فایل حافظه وجود داشته باشد
+            git diff --staged --quiet || (git commit -m "Update recent proxies memory" && git push)
           else
-            echo "state.txt not found, skipping commit."
+            echo "Recent proxies file not found, skipping commit."
           fi
-# A small change to re-trigger the schedule
