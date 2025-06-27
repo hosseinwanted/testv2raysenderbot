@@ -79,7 +79,7 @@ def send_final_message(sentence, prices, proxies_list):
         
         # ترکیب همه موارد در یک خط با جداکننده
         price_line = " | ".join(price_items)
-        price_section = f"📊 **آخرین قیمت‌ها:**\n{price_line}"
+        price_section = f"📊 <b>آخرین قیمت‌ها:</b>\n{price_line}"
     else:
         price_section = "📊 در حال حاضر قیمت‌ها در دسترس نیستند."
         
