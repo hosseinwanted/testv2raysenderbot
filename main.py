@@ -10,50 +10,51 @@ PROXIES_URL = "https://raw.githubusercontent.com/MhdiTaheri/ProxyCollector/main/
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 SENTENCES_FILE = "sentences.txt"
 
-api_keys_str = os.environ.get("NAVASAN_API_KEYS", "")
+# --- تنظیمات API جدید BrsApi ---
+# خواندن کلیدها از سکرت گیت‌هاب
+api_keys_str = os.environ.get("BRS_API_KEY", "")
 API_KEYS = [key.strip() for key in api_keys_str.split('\n') if key.strip()]
-PRICE_API_URL = "http://api.navasan.tech/latest/?api_key={}"
+PRICE_API_URL = f"https://BrsApi.ir/Api/Market/Gold_Currency.php?key={{}}"
 
+# !!! مهم: لینک کانال‌های خود را اینجا وارد کنید !!!
 TELEGRAM_PROXY_CHANNEL_URL = "https://t.me/YourTelegramProxyChannel"
 V2RAY_CHANNEL_URL = "https://t.me/YourV2rayChannel"
 
-# --- تابع جدید برای قالب‌بندی اعداد ---
 def format_number(value):
     """اعداد را به صورت سه‌رقم سه‌رقم با کاما جدا می‌کند."""
     try:
-        # ابتدا هرگونه کاما را حذف کرده و به عدد تبدیل می‌کنیم
         numeric_value = int(float(str(value).replace(',', '')))
-        # سپس با فرمت جدید برمی‌گردانیم
         return f"{numeric_value:,}"
     except (ValueError, TypeError):
-        # اگر مقدار ورودی عدد نبود (مثلا N/A)، همان را برگردان
         return value
 
 def get_prices_from_api():
-    """قیمت ۵ دارایی محبوب را از API جدید Navasan می‌خواند."""
+    """قیمت‌ها را از BrsApi.ir با یک کلید تصادفی می‌خواند."""
     try:
         if not API_KEYS:
-            raise ValueError("NAVASAN_API_KEYS secret is not set or is empty.")
+            raise ValueError("BRS_API_KEY secret is not set or is empty.")
 
-        print("Fetching popular assets from Navasan JSON API...")
+        print("Fetching prices from BrsApi.ir...")
         random_api_key = random.choice(API_KEYS)
         url = PRICE_API_URL.format(random_api_key)
         
         response = requests.get(url, timeout=15)
         response.raise_for_status()
-        data = response.json()
+        api_data = response.json()
         
-        # استخراج ۵ دارایی محبوب
-        prices = {
-            'usd': data.get('usd_sell', {}).get('value', 'N/A'),
-            'eur': data.get('eur', {}).get('value', 'N/A'),
-            'sekeh': data.get('sekkeh', {}).get('value', 'N/A'),
-            '18ayar': data.get('18ayar', {}).get('value', 'N/A'),
-            'usdt': data.get('usdt', {}).get('value', 'N/A')
-        }
+        prices = {}
+        # نمادهای مورد نظر ما برای استخراج
+        target_symbols = {"USD": "usd", "EUR": "eur", "IR_COIN_EMAMI": "sekeh", "IR_GOLD_18": "18ayar", "USDT": "usdt"}
         
+        for item in api_data:
+            if item['symbol'] in target_symbols:
+                key = target_symbols[item['symbol']]
+                # قیمت به تومان است (بر اساس مستندات)
+                prices[key] = item['price']
+
         print(f"Prices fetched successfully: {prices}")
         return prices
+        
     except Exception as e:
         print(f"An exception occurred in get_prices_from_api: {e}")
         return None
@@ -67,17 +68,15 @@ def fetch_list_from_file(filename):
         return []
 
 def send_final_message(sentence, prices, proxies_list):
-    """پیام نهایی و ترکیبی را با قالب جدید ارسال می‌کند."""
+    """پیام نهایی و ترکیبی را با قالب بهینه ارسال می‌کند."""
     price_items = []
     if prices:
-        # استفاده از تابع format_number برای هر قیمت
-        price_items.append(f"💵 دلار: <code>{format_number(prices.get('usd'))}</code>")
-        price_items.append(f"🇪🇺 یورو: <code>{format_number(prices.get('eur'))}</code>")
-        price_items.append(f"🪙 سکه: <code>{format_number(prices.get('sekeh'))}</code>")
-        price_items.append(f"🌟 طلا ۱۸: <code>{format_number(prices.get('18ayar'))}</code>")
-        price_items.append(f"₮ تتر: <code>{format_number(prices.get('usdt'))}</code>")
+        price_items.append(f"💵 دلار: <code>{format_number(prices.get('usd', 'N/A'))}</code>")
+        price_items.append(f"🇪🇺 یورو: <code>{format_number(prices.get('eur', 'N/A'))}</code>")
+        price_items.append(f"🪙 سکه: <code>{format_number(prices.get('sekeh', 'N/A'))}</code>")
+        price_items.append(f"🌟 طلا ۱۸: <code>{format_number(prices.get('18ayar', 'N/A'))}</code>")
+        price_items.append(f"₮ تتر: <code>{format_number(prices.get('usdt', 'N/A'))}</code>")
         
-        # ترکیب همه موارد در یک خط با جداکننده
         price_line = " | ".join(price_items)
         price_section = f"📊 <b>آخرین قیمت‌ها:</b>\n{price_line}"
     else:
@@ -91,12 +90,7 @@ def send_final_message(sentence, prices, proxies_list):
     keyboard = [proxy_buttons, channel_buttons]
     reply_markup = json.dumps({"inline_keyboard": keyboard})
 
-    message_text = (
-        f"{sentence}\n\n"
-        f"{price_section}\n\n"
-        f"👇 برای اتصال، یکی از سرورهای زیر را انتخاب کنید:"
-    )
-
+    message_text = (f"{sentence}\n\n{price_section}\n\n👇 برای اتصال، یکی از سرورهای زیر را انتخاب کنید:")
     payload = {'chat_id': CHAT_ID, 'text': message_text, 'parse_mode': 'HTML', 'reply_markup': reply_markup}
     
     requests.post(TELEGRAM_API_URL, data=payload, timeout=10)
