@@ -10,10 +10,8 @@ PROXIES_URL = "https://raw.githubusercontent.com/MhdiTaheri/ProxyCollector/main/
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 SENTENCES_FILE = "sentences.txt"
 
-# --- بخش کلیدی: خواندن امن کلیدهای API از سکرت ---
-# خواندن رشته چندخطی کلیدها از متغیر محیطی
+# --- خواندن امن کلیدهای API از سکرت گیت‌هاب ---
 api_keys_str = os.environ.get("NAVASAN_API_KEYS", "")
-# تبدیل رشته به لیست، با حذف خطوط خالی احتمالی
 API_KEYS = [key.strip() for key in api_keys_str.split('\n') if key.strip()]
 
 PRICE_API_URL = "http://api.navasan.tech/latest/?api_key={}"
@@ -25,7 +23,6 @@ V2RAY_CHANNEL_URL = "https://t.me/YourV2rayChannel"
 def get_prices_from_api():
     """قیمت‌ها را از API جدید Navasan با استفاده از یک کلید تصادفی می‌خواند."""
     try:
-        # بررسی وجود کلید API قبل از اجرا
         if not API_KEYS:
             raise ValueError("NAVASAN_API_KEYS secret is not set or is empty.")
 
@@ -50,7 +47,6 @@ def get_prices_from_api():
         print(f"An exception occurred in get_prices_from_api: {e}")
         return None
 
-# بقیه کد بدون تغییر باقی می‌ماند...
 def fetch_list_from_file(filename):
     try:
         with open(filename, "r", encoding="utf-8") as f:
@@ -65,7 +61,7 @@ def send_final_message(sentence, prices, proxies_list):
         price_text += (
             f"💵 دلار آمریکا: <code>{prices.get('usd', 'N/A')}</code>\n"
             f"🇪🇺 یورو: <code>{prices.get('eur', 'N/A')}</code>\n"
-            f"🪙 سکه امامی: <code>{prices.get('sekeh', 'N/A')}</code>"
+            f"🪙 سکه امامی: <code>{prices.get('sekkeh', 'N/A')}</code>"
         )
     else:
         price_text += "در حال حاضر قیمت‌ها در دسترس نیستند."
