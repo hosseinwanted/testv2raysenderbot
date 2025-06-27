@@ -17,11 +17,11 @@ API_KEYS = [key.strip() for key in api_keys_str.split('\n') if key.strip()]
 PRICE_API_URL = "http://api.navasan.tech/latest/?api_key={}"
 
 # !!! مهم: لینک کانال‌های خود را اینجا وارد کنید !!!
-TELEGRAM_PROXY_CHANNEL_URL = "https://t.me/YourTelegramProxyChannel"
-V2RAY_CHANNEL_URL = "https://t.me/YourV2rayChannel"
+TELEGRAM_PROXY_CHANNEL_URL = "https://t.me/YourTelegramProxyChannel" # لینک کانال پروکسی تلگرام
+V2RAY_CHANNEL_URL = "https://t.me/YourV2rayChannel" # لینک کانال V2ray
 
 def get_prices_from_api():
-    """قیمت‌ها را می‌خواند و کل پاسخ JSON را برای اشکال‌یابی چاپ می‌کند."""
+    """قیمت‌ها را از API جدید Navasan با استفاده از یک کلید تصادفی می‌خواند."""
     try:
         if not API_KEYS:
             raise ValueError("NAVASAN_API_KEYS secret is not set or is empty.")
@@ -35,18 +35,11 @@ def get_prices_from_api():
         
         data = response.json()
         
-        # --- بخش کلیدی اشکال‌یابی ---
-        # چاپ کردن کل ساختار JSON دریافتی به صورت خوانا
-        print("\n--- FULL JSON RESPONSE FROM API ---")
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-        print("--- END OF JSON RESPONSE ---\n")
-        # --- پایان بخش اشکال‌یابی ---
-        
-        # کد استخراج مثل قبل باقی می‌ماند
+        # استخراج قیمت‌ها با استفاده از نام‌های صحیح و تایید شده
         prices = {
             'usd': data.get('usd_sell', {}).get('value', 'N/A'),
             'eur': data.get('eur', {}).get('value', 'N/A'),
-            'sekeh': data.get('sekkeh', {}).get('value', 'N/A') # این خط احتمالاً اشتباه است
+            'sekeh': data.get('sekkeh', {}).get('value', 'N/A')
         }
         
         print(f"Prices fetched successfully: {prices}")
@@ -56,6 +49,7 @@ def get_prices_from_api():
         return None
 
 def fetch_list_from_file(filename):
+    """اطلاعات را از یک فایل محلی می‌خواند."""
     try:
         with open(filename, "r", encoding="utf-8") as f:
             return [line.strip() for line in f if line.strip()]
@@ -64,12 +58,13 @@ def fetch_list_from_file(filename):
         return []
 
 def send_final_message(sentence, prices, proxies_list):
+    """پیام نهایی و ترکیبی را ارسال می‌کند."""
     price_text = "📊 **آخرین نرخ ارز و طلا:**\n\n"
-    if prices:
+    if prices and prices.get('usd') != 'N/A':
         price_text += (
             f"💵 دلار آمریکا: <code>{prices.get('usd', 'N/A')}</code>\n"
             f"🇪🇺 یورو: <code>{prices.get('eur', 'N/A')}</code>\n"
-            f"🪙 سکه امامی: <code>{prices.get('sekkeh', 'N/A')}</code>"
+            f"🪙 سکه امامی: <code>{prices.get('sekeh', 'N/A')}</code>"
         )
     else:
         price_text += "در حال حاضر قیمت‌ها در دسترس نیستند."
