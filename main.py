@@ -10,36 +10,46 @@ PROXIES_URL = "https://raw.githubusercontent.com/MhdiTaheri/ProxyCollector/main/
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 SENTENCES_FILE = "sentences.txt"
 
-# --- خواندن امن کلیدهای API از سکرت گیت‌هاب ---
 api_keys_str = os.environ.get("NAVASAN_API_KEYS", "")
 API_KEYS = [key.strip() for key in api_keys_str.split('\n') if key.strip()]
-
 PRICE_API_URL = "http://api.navasan.tech/latest/?api_key={}"
 
-# !!! مهم: لینک کانال‌های خود را اینجا وارد کنید !!!
-TELEGRAM_PROXY_CHANNEL_URL = "https://t.me/YourTelegramProxyChannel" # لینک کانال پروکسی تلگرام
-V2RAY_CHANNEL_URL = "https://t.me/YourV2rayChannel" # لینک کانال V2ray
+TELEGRAM_PROXY_CHANNEL_URL = "https://t.me/YourTelegramProxyChannel"
+V2RAY_CHANNEL_URL = "https://t.me/YourV2rayChannel"
+
+# --- تابع جدید برای قالب‌بندی اعداد ---
+def format_number(value):
+    """اعداد را به صورت سه‌رقم سه‌رقم با کاما جدا می‌کند."""
+    try:
+        # ابتدا هرگونه کاما را حذف کرده و به عدد تبدیل می‌کنیم
+        numeric_value = int(float(str(value).replace(',', '')))
+        # سپس با فرمت جدید برمی‌گردانیم
+        return f"{numeric_value:,}"
+    except (ValueError, TypeError):
+        # اگر مقدار ورودی عدد نبود (مثلا N/A)، همان را برگردان
+        return value
 
 def get_prices_from_api():
-    """قیمت‌ها را از API جدید Navasan با استفاده از یک کلید تصادفی می‌خواند."""
+    """قیمت ۵ دارایی محبوب را از API جدید Navasan می‌خواند."""
     try:
         if not API_KEYS:
             raise ValueError("NAVASAN_API_KEYS secret is not set or is empty.")
 
-        print("Fetching currency prices from Navasan JSON API...")
+        print("Fetching popular assets from Navasan JSON API...")
         random_api_key = random.choice(API_KEYS)
         url = PRICE_API_URL.format(random_api_key)
         
         response = requests.get(url, timeout=15)
         response.raise_for_status()
-        
         data = response.json()
         
-        # استخراج قیمت‌ها با استفاده از نام‌های صحیح و تایید شده
+        # استخراج ۵ دارایی محبوب
         prices = {
             'usd': data.get('usd_sell', {}).get('value', 'N/A'),
             'eur': data.get('eur', {}).get('value', 'N/A'),
-            'sekeh': data.get('sekkeh', {}).get('value', 'N/A')
+            'sekeh': data.get('sekkeh', {}).get('value', 'N/A'),
+            '18ayar': data.get('18ayar', {}).get('value', 'N/A'),
+            'usdt': data.get('usdt', {}).get('value', 'N/A')
         }
         
         print(f"Prices fetched successfully: {prices}")
@@ -49,7 +59,6 @@ def get_prices_from_api():
         return None
 
 def fetch_list_from_file(filename):
-    """اطلاعات را از یک فایل محلی می‌خواند."""
     try:
         with open(filename, "r", encoding="utf-8") as f:
             return [line.strip() for line in f if line.strip()]
@@ -58,16 +67,21 @@ def fetch_list_from_file(filename):
         return []
 
 def send_final_message(sentence, prices, proxies_list):
-    """پیام نهایی و ترکیبی را ارسال می‌کند."""
-    price_text = "📊 **آخرین نرخ ارز و طلا:**\n\n"
-    if prices and prices.get('usd') != 'N/A':
-        price_text += (
-            f"💵 دلار آمریکا: <code>{prices.get('usd', 'N/A')}</code>\n"
-            f"🇪🇺 یورو: <code>{prices.get('eur', 'N/A')}</code>\n"
-            f"🪙 سکه امامی: <code>{prices.get('sekeh', 'N/A')}</code>"
-        )
+    """پیام نهایی و ترکیبی را با قالب جدید ارسال می‌کند."""
+    price_items = []
+    if prices:
+        # استفاده از تابع format_number برای هر قیمت
+        price_items.append(f"💵 دلار: <code>{format_number(prices.get('usd'))}</code>")
+        price_items.append(f"🇪🇺 یورو: <code>{format_number(prices.get('eur'))}</code>")
+        price_items.append(f"🪙 سکه: <code>{format_number(prices.get('sekeh'))}</code>")
+        price_items.append(f"🌟 طلا ۱۸: <code>{format_number(prices.get('18ayar'))}</code>")
+        price_items.append(f"₮ تتر: <code>{format_number(prices.get('usdt'))}</code>")
+        
+        # ترکیب همه موارد در یک خط با جداکننده
+        price_line = " | ".join(price_items)
+        price_section = f"📊 **آخرین قیمت‌ها:**\n{price_line}"
     else:
-        price_text += "در حال حاضر قیمت‌ها در دسترس نیستند."
+        price_section = "📊 در حال حاضر قیمت‌ها در دسترس نیستند."
         
     proxy_buttons = [{"text": f"✅ Proxy {i + 1}", "url": p} for i, p in enumerate(proxies_list)]
     channel_buttons = [
@@ -79,8 +93,7 @@ def send_final_message(sentence, prices, proxies_list):
 
     message_text = (
         f"{sentence}\n\n"
-        f"------------------------------\n"
-        f"{price_text}\n\n"
+        f"{price_section}\n\n"
         f"👇 برای اتصال، یکی از سرورهای زیر را انتخاب کنید:"
     )
 
