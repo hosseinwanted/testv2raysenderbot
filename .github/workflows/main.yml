@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
-    # --- این بخش برای دادن دسترسی نوشتن اضافه شده است ---
+    # --- این بخش کلیدی، مشکل دسترسی را حل می‌کند ---
     permissions:
       contents: write
 
