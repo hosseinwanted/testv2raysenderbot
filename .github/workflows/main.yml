@@ -1,9 +1,9 @@
-name: Send Proxies to Telegram
+name: Send Single Proxy to Telegram
 
 on:
   schedule:
-    # این دستور به معنی "اجرا در دقایق 0, 15, 30, 45 هر ساعت" است
-    - cron: '*/15 * * * *'
+    # اجرا هر 5 دقیقه (کمترین زمانبندی قابل اعتماد در GitHub Actions)
+    - cron: '*/5 * * * *'
   workflow_dispatch:
     # این گزینه به شما اجازه می‌دهد که گردش کار را به صورت دستی هم اجرا کنید
 
@@ -14,9 +14,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        # نیاز داریم که تاریخچه گیت را برای ذخیره فایل last_content.txt داشته باشیم
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -28,16 +25,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Run the script
+      - name: Run the script to send one proxy
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python main.py
         
-      - name: Commit and push if content changed
+      - name: Commit state file
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add last_content.txt
-          # فقط در صورتی کامیت کن که تغییری وجود داشته باشد
-          git diff --staged --quiet || (git commit -m "Update last sent proxies" && git push)
+          git add state.txt
+          # فقط در صورتی کامیت کن که فایل state.txt تغییر کرده باشد
+          git diff --staged --quiet || (git commit -m "Update proxy state" && git push)
