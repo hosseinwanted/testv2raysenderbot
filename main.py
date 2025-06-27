@@ -2,88 +2,120 @@ import requests
 import os
 import random
 import json
+import codecs # کتابخانه کمکی برای پردازش متن
+from bs4 import BeautifulSoup
 
 # --- تنظیمات اصلی ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
 PROXIES_URL = "https://raw.githubusercontent.com/MhdiTaheri/ProxyCollector/main/proxy.txt"
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-SENTENCES_FILE = "sentences.txt" # فایل جملات
+SENTENCES_FILE = "sentences.txt"
+
+# --- آدرس جدید و بهینه برای قیمت‌ها ---
+# ما فقط ارزهایی را درخواست می‌کنیم که نیاز داریم تا سرعت بالاتر برود
+PRICE_API_URL = "https://www.navasan.tech/wp-navasan.php?usd&eur&sekkeh"
 
 # !!! مهم: لینک کانال‌های خود را اینجا وارد کنید !!!
-TELEGRAM_PROXY_CHANNEL_URL = "https://t.me/YourTelegramProxyChannel" # لینک کانال پروکسی تلگرام
-V2RAY_CHANNEL_URL = "https://t.me/YourV2rayChannel" # لینک کانال V2ray
+TELEGRAM_PROXY_CHANNEL_URL = "https://t.me/YourTelegramProxyChannel"
+V2RAY_CHANNEL_URL = "https://t.me/YourV2rayChannel"
 
-def fetch_data(url):
-    """یک تابع عمومی برای دریافت اطلاعات از یک آدرس"""
+def fetch_list_from_file(filename):
+    """اطلاعات را از یک فایل محلی می‌خواند."""
     try:
-        response = requests.get(url, timeout=15)
-        response.raise_for_status()
-        return response.text.strip().split('\n')
-    except requests.RequestException as e:
-        print(f"Error fetching data from {url}: {e}")
+        with open(filename, "r", encoding="utf-8") as f:
+            return [line.strip() for line in f if line.strip()]
+    except Exception as e:
+        print(f"Error reading file {filename}: {e}")
         return []
 
-def send_message_with_layout(sentence, proxies_list):
-    """
-    یک پیام با ساختار جدید (جمله + دکمه‌های چند ردیفی) ارسال می‌کند.
-    """
-    # --- ساخت دکمه‌ها ---
-    # ردیف اول: ۳ دکمه برای پروکسی‌ها
-    proxy_buttons = []
-    for i, proxy_link in enumerate(proxies_list):
-        proxy_buttons.append({"text": f"✅ Proxy {i + 1}", "url": proxy_link})
+def get_prices_from_api():
+    """قیمت‌ها را از API غیررسمی Navasan می‌خواند."""
+    prices = {}
+    try:
+        print("Fetching currency prices from Navasan API...")
+        response = requests.get(PRICE_API_URL, timeout=15)
+        response.raise_for_status()
+        
+        # 1. استخراج رشته HTML از داخل فراخوانی جاوااسکریپت
+        raw_js = response.text
+        # پیدا کردن محتوای داخل ('"...');
+        start = raw_js.find("('\"") + 3
+        end = raw_js.rfind("\"')")
+        html_escaped_string = raw_js[start:end]
+        
+        # 2. پاک‌سازی و آماده‌سازی رشته HTML
+        html_string = codecs.decode(html_escaped_string, 'unicode_escape')
+        
+        # 3. پردازش HTML با BeautifulSoup
+        soup = BeautifulSoup(html_string, 'lxml')
+        
+        # 4. استخراج قیمت‌ها با استفاده از ID یکتای هر ردیف
+        prices['usd'] = soup.select_one("tr#usd > td.val").text.strip()
+        prices['eur'] = soup.select_one("tr#eur > td.val").text.strip()
+        prices['sekeh'] = soup.select_one("tr#sekkeh > td.val").text.strip()
+        
+        print(f"Prices fetched successfully: {prices}")
+        return prices
+    except Exception as e:
+        print(f"Failed to get prices from Navasan API: {e}")
+        return None
 
-    # ردیف دوم: ۲ دکمه ثابت برای لینک کانال‌ها
+def send_final_message(sentence, prices, proxies_list):
+    """پیام نهایی و ترکیبی را ارسال می‌کند."""
+    # بخش قیمت‌ها
+    price_text = "📊 **آخرین نرخ ارز و طلا:**\n\n"
+    if prices:
+        # استفاده از تگ <code> برای نمایش بهتر اعداد
+        price_text += (
+            f"💵 دلار آمریکا: <code>{prices.get('usd', 'N/A')}</code>\n"
+            f"🇪🇺 یورو: <code>{prices.get('eur', 'N/A')}</code>\n"
+            f"🪙 سکه امامی: <code>{prices.get('sekeh', 'N/A')}</code>"
+        )
+    else:
+        price_text += "در حال حاضر قیمت‌ها در دسترس نیستند."
+        
+    # بخش دکمه‌ها
+    proxy_buttons = [{"text": f"✅ Proxy {i + 1}", "url": p} for i, p in enumerate(proxies_list)]
     channel_buttons = [
         {"text": "🚀 کانال پروکسی تلگرام", "url": TELEGRAM_PROXY_CHANNEL_URL},
         {"text": "⚡️ کانال V2ray رایگان", "url": V2RAY_CHANNEL_URL}
     ]
-    
-    # ترکیب ردیف‌ها برای ساخت کیبورد نهایی
-    keyboard = [
-        proxy_buttons,    # ردیف اول
-        channel_buttons   # ردیف دوم
-    ]
-    
-    reply_markup = {"inline_keyboard": keyboard}
+    keyboard = [proxy_buttons, channel_buttons]
+    reply_markup = json.dumps({"inline_keyboard": keyboard})
 
-    # استفاده از جمله تصادفی به عنوان متن اصلی پیام
-    message_text = sentence
+    # ترکیب نهایی پیام
+    message_text = (
+        f"{sentence}\n\n"
+        f"------------------------------\n"
+        f"{price_text}\n\n"
+        f"👇 برای اتصال، یکی از سرورهای زیر را انتخاب کنید:"
+    )
 
-    payload = {
-        'chat_id': CHAT_ID,
-        'text': message_text,
-        'parse_mode': 'HTML',
-        'reply_markup': json.dumps(reply_markup)
-    }
+    payload = {'chat_id': CHAT_ID, 'text': message_text, 'parse_mode': 'HTML', 'reply_markup': reply_markup}
     
-    try:
-        response = requests.post(TELEGRAM_API_URL, data=payload, timeout=10)
-        response.raise_for_status()
-        print("Successfully sent the new layout message.")
-        return True
-    except requests.RequestException as e:
-        print(f"Error sending message to Telegram: {e}")
-        if e.response: print(f"Telegram API Response: {e.response.text}")
-        return False
+    requests.post(TELEGRAM_API_URL, data=payload, timeout=10)
+    print("Final combined message sent to Telegram.")
 
 # --- منطق اصلی برنامه ---
 if __name__ == "__main__":
-    # ۱. یک جمله تصادفی انتخاب کن
-    sentences = fetch_data(SENTENCES_FILE)
-    if not sentences:
-        # اگر فایلی نبود، از یک جمله پیش‌فرض استفاده کن
-        chosen_sentence = "بهترین راه برای پیش‌بینی آینده، ساختن آن است."
-    else:
-        chosen_sentence = random.choice(sentences)
-    
-    # ۲. سه پروکسی تصادفی انتخاب کن
-    all_proxies = [line for line in fetch_data(PROXIES_URL) if '://' in line]
-    if len(all_proxies) < 3:
-        print("Not enough proxies found to send. Exiting.")
-    else:
-        selected_proxies = random.sample(all_proxies, 3)
+    # ۱. خواندن جملات
+    sentences = fetch_list_from_file(SENTENCES_FILE)
+    chosen_sentence = random.choice(sentences) if sentences else "موفقیت، نتیجه‌ی تلاش‌های کوچک و روزمره است."
+
+    # ۲. دریافت قیمت‌ها از API جدید
+    current_prices = get_prices_from_api()
+
+    # ۳. دریافت پروکسی‌ها
+    try:
+        proxies_text = requests.get(PROXIES_URL, timeout=15).text
+        all_proxies = [p for p in proxies_text.strip().split('\n') if '://' in p]
         
-        # ۳. پیام را با ساختار جدید ارسال کن
-        send_message_with_layout(chosen_sentence, selected_proxies)
+        if len(all_proxies) >= 3:
+            selected_proxies = random.sample(all_proxies, 3)
+            # ۴. ارسال پیام نهایی
+            send_final_message(chosen_sentence, current_prices, selected_proxies)
+        else:
+            print("Not enough proxies found.")
+    except Exception as e:
+        print(f"Failed to fetch proxies: {e}")
