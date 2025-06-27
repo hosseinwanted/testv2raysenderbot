@@ -30,35 +30,47 @@ def fetch_list_from_file(filename):
         return []
 
 def get_prices_from_api():
-    """قیمت‌ها را از API غیررسمی Navasan می‌خواند."""
+    """قیمت‌ها را از API غیررسمی Navasan می‌خواند و خطایابی بهتری دارد."""
     prices = {}
     try:
         print("Fetching currency prices from Navasan API...")
-        response = requests.get(PRICE_API_URL, timeout=15)
+        url = "https://www.navasan.tech/wp-navasan.php?usd&eur&sekkeh"
+        response = requests.get(url, timeout=15)
         response.raise_for_status()
         
-        # 1. استخراج رشته HTML از داخل فراخوانی جاوااسکریپت
         raw_js = response.text
-        # پیدا کردن محتوای داخل ('"...');
         start = raw_js.find("('\"") + 3
         end = raw_js.rfind("\"')")
+        if start == 2 or end == -1:
+            raise ValueError("Could not find the start/end pattern in the JS response.")
+            
         html_escaped_string = raw_js[start:end]
         
-        # 2. پاک‌سازی و آماده‌سازی رشته HTML
+        # --- بخش اصلاح شده برای رفع خطا ---
+        # اگر رشته با یک بک‌اسلش تنها تمام شده بود، آن را حذف کن
+        if html_escaped_string.endswith('\\'):
+            html_escaped_string = html_escaped_string[:-1]
+        # --- پایان بخش اصلاح شده ---
+
         html_string = codecs.decode(html_escaped_string, 'unicode_escape')
-        
-        # 3. پردازش HTML با BeautifulSoup
         soup = BeautifulSoup(html_string, 'lxml')
         
-        # 4. استخراج قیمت‌ها با استفاده از ID یکتای هر ردیف
-        prices['usd'] = soup.select_one("tr#usd > td.val").text.strip()
-        prices['eur'] = soup.select_one("tr#eur > td.val").text.strip()
-        prices['sekeh'] = soup.select_one("tr#sekkeh > td.val").text.strip()
+        targets = {'usd': "tr#usd", 'eur': "tr#eur", 'sekeh': "tr#sekkeh"}
+        for name, selector in targets.items():
+            element = soup.select_one(f"{selector} > td.val")
+            if element:
+                prices[name] = element.text.strip()
+            else:
+                print(f"Warning: Could not find the element for '{name}'.")
+                prices[name] = "N/A"
         
+        if all(value == "N/A" for value in prices.values()):
+             raise ValueError("Failed to extract any prices. HTML structure likely changed.")
+
         print(f"Prices fetched successfully: {prices}")
         return prices
     except Exception as e:
-        print(f"Failed to get prices from Navasan API: {e}")
+        print(f"An exception occurred in get_prices_from_api: {e}")
         return None
 
 def send_final_message(sentence, prices, proxies_list):
