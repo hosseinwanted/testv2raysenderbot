@@ -1,21 +1,14 @@
-# نام نمایشی گردش کار در تب Actions
-name: Send Custom Proxy Message
+name: Send API Data to Telegram
 
-# تعریف زمان‌بندی و تریگرهای اجرا
 on:
   schedule:
-    # اجرا در ابتدای هر ساعت
     - cron: '0 * * * *'
-    
-  # اجازه اجرای دستی از تب Actions
   workflow_dispatch:
 
-# تعریف کارها
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    # مراحل اجرای کار
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,15 +18,14 @@ jobs:
         with:
           python-version: '3.10'
 
-      # --- این مرحله باید اصلاح شود ---
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # نصب تمام کتابخانه‌های مورد نیاز
-          pip install requests beautifulsoup4 lxml
+        run: pip install requests
 
-      - name: Run script to send message
+      # در این بخش، سکرت جدید را هم به env اضافه می‌کنیم
+      - name: Run script
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
+          NAVASAN_API_KEYS: ${{ secrets.NAVASAN_API_KEYS }} # <--- این خط اضافه شد
+
         run: python main.py
