@@ -1,50 +1,51 @@
 import requests
 import os
-import time
 
 # --- تنظیمات اصلی ---
-# این مقادیر از GitHub Secrets خوانده می‌شوند
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
-
-# آدرس فایل حاوی پروکسی‌ها
 PROXIES_URL = "https://raw.githubusercontent.com/MhdiTaheri/ProxyCollector/main/proxy.txt"
-
-# آدرس API تلگرام
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-# فایلی برای ذخیره محتوای آخرین لیست پروکسی ارسال شده برای جلوگیری از ارسال تکراری
-LAST_CONTENT_FILE = "last_content.txt"
+# فایلی برای ذخیره شماره ردیف (ایندکس) آخرین پروکسی ارسال شده
+STATE_FILE = "state.txt"
 
 def fetch_proxies():
-    """پروکسی‌ها را از آدرس مشخص شده دریافت می‌کند."""
+    """لیست کامل پروکسی‌ها را دریافت می‌کند."""
     try:
-        response = requests.get(PROXIES_URL, timeout=10)
-        response.raise_for_status()  # بررسی وضعیت پاسخ HTTP
-        return response.text
+        response = requests.get(PROXIES_URL, timeout=15)
+        response.raise_for_status()
+        # فقط خطوطی که با 'ss://', 'vmess://', 'trojan://' و ... شروع می‌شوند را نگه دار
+        proxies = [line for line in response.text.strip().split('\n') if '://' in line]
+        return proxies
     except requests.RequestException as e:
         print(f"Error fetching proxies: {e}")
-        return None
+        return []
 
-def get_last_content():
-    """محتوای آخرین ارسال موفق را از فایل می‌خواند."""
-    if os.path.exists(LAST_CONTENT_FILE):
-        with open(LAST_CONTENT_FILE, "r") as f:
-            return f.read()
-    return ""
+def get_last_index():
+    """شماره ردیف آخرین پروکسی ارسال شده را از فایل می‌خواند."""
+    if not os.path.exists(STATE_FILE):
+        return -1  # اگر فایل وجود نداشت، از اول شروع کن
+    try:
+        with open(STATE_FILE, "r") as f:
+            return int(f.read().strip())
+    except (ValueError, FileNotFoundError):
+        return -1 # اگر فایل خالی یا خراب بود، از اول شروع کن
 
-def save_last_content(content):
-    """محتوای جدید را در فایل ذخیره می‌کند."""
-    with open(LAST_CONTENT_FILE, "w") as f:
-        f.write(content)
+def save_next_index(index):
+    """شماره ردیف جدید را در فایل ذخیره می‌کند."""
+    with open(STATE_FILE, "w") as f:
+        f.write(str(index))
+    print(f"Saved next index for next run: {index}")
 
-def send_to_telegram(proxies_text):
-    """پروکسی‌ها را به کانال تلگرام ارسال می‌کند."""
-    # تقسیم پروکسی‌ها به دسته‌های کوچکتر برای جلوگیری از طولانی شدن پیام
-    proxies_list = proxies_text.strip().split("\n")
-    # می‌توانید چند پروکسی برتر را انتخاب کنید یا همه را بفرستید
-    # در اینجا ۱۰ پروکسی اول را انتخاب می‌کنیم
-    message_text = "✅ چند پروکسی جدید و فعال:\n\n" + "\n".join(proxies_list[:10])
+
+def send_single_proxy(proxy):
+    """یک پروکسی مشخص را به تلگرام ارسال می‌کند."""
+    message_text = (
+        f"✅ **New Proxy**\n\n"
+        f"`{proxy}`\n\n"
+        f"#proxy"
+    )
     
     payload = {
         'chat_id': CHAT_ID,
@@ -55,30 +56,29 @@ def send_to_telegram(proxies_text):
     try:
         response = requests.post(TELEGRAM_API_URL, data=payload, timeout=10)
         response.raise_for_status()
-        print("Proxies sent successfully to Telegram.")
+        print(f"Successfully sent proxy: {proxy[:30]}...")
         return True
     except requests.RequestException as e:
         print(f"Error sending to Telegram: {e}")
-        # در صورت خطا، محتوای پاسخ را نمایش بده تا بهتر دیباگ کنی
         if e.response:
             print(f"Telegram API Response: {e.response.text}")
         return False
 
 if __name__ == "__main__":
-    print("Starting proxy collector bot...")
+    proxies_list = fetch_proxies()
     
-    new_proxies = fetch_proxies()
-    
-    if new_proxies:
-        last_content = get_last_content()
-        
-        # فقط در صورتی ارسال کن که محتوای جدید با محتوای قبلی متفاوت باشد
-        if new_proxies != last_content:
-            print("New proxies found. Sending to Telegram...")
-            if send_to_telegram(new_proxies):
-                # اگر ارسال موفق بود، محتوای جدید را ذخیره کن
-                save_last_content(new_proxies)
-        else:
-            print("No new proxies found. Skipping.")
+    if not proxies_list:
+        print("No proxies found or failed to fetch. Exiting.")
     else:
-        print("Failed to fetch proxies. Exiting.")
+        last_index = get_last_index()
+        print(f"Last sent index was: {last_index}")
+        
+        # محاسبه ایندکس بعدی و چرخیدن به اول لیست در صورت رسیدن به انتها
+        next_index = (last_index + 1) % len(proxies_list)
+        print(f"Calculated next index: {next_index}")
+        
+        proxy_to_send = proxies_list[next_index]
+        
+        if send_single_proxy(proxy_to_send):
+            # فقط در صورت ارسال موفق، ایندکس را برای دفعه بعد ذخیره کن
+            save_next_index(next_index)
