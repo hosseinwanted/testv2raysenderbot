@@ -40,21 +40,24 @@ def save_next_index(index):
 
 
 def send_single_proxy(proxy):
-    """یک پروکسی مشخص را به تلگرام ارسال می‌کند."""
+    """یک پروکسی مشخص را با استفاده از فرمت HTML به تلگرام ارسال می‌کند."""
+    # استفاده از تگ‌های HTML به جای Markdown
+    # <b> برای بولد کردن و <code> برای نمایش به صورت کد
     message_text = (
-        f"✅ **New Proxy**\n\n"
-        f"`{proxy}`\n\n"
+        f"✅ <b>New Proxy</b>\n\n"
+        f"<code>{proxy}</code>\n\n"
         f"#proxy"
     )
     
     payload = {
         'chat_id': CHAT_ID,
         'text': message_text,
-        'parse_mode': 'Markdown'
+        'parse_mode': 'HTML'  # <<<< تغییر مهم اینجاست
     }
     
     try:
         response = requests.post(TELEGRAM_API_URL, data=payload, timeout=10)
+        # این متد در صورت بروز خطا (کدهای 4xx یا 5xx) یک استثنا ایجاد می‌کند
         response.raise_for_status()
         print(f"Successfully sent proxy: {proxy[:30]}...")
         return True
