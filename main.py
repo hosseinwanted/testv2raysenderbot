@@ -2,6 +2,7 @@ import requests
 import os
 import random
 import json
+import jdatetime
 
 # --- تنظیمات اصلی ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -67,13 +68,28 @@ def fetch_list_from_file(filename):
         print(f"Warning: Could not read file {filename}: {e}")
         return []
 
-def send_final_message(sentence, prices, proxies_list):
-    """پیام نهایی و ترکیبی را با قالب بهینه ارسال می‌کند."""
+def send_final_message(sentence, prices, proxies_list, time_str):
+    """پیام نهایی و ترکیبی را با قالب هوشمند و مقاوم ارسال می‌کند."""
     price_items = []
     if prices:
+        # --- بخش کلیدی: منطق هوشمند برای اصلاح قیمت سکه ---
+        sekeh_raw = prices.get('sekeh', 'N/A')
+        sekeh_corrected = sekeh_raw
+        try:
+            numeric_sekeh = int(float(str(sekeh_raw).replace(',', '')))
+            # اگر قیمت سکه کمتر از یک میلیون تومان بود، آن را در 1000 ضرب کن
+            if 0 < numeric_sekeh < 1000000:
+                sekeh_corrected = numeric_sekeh * 1000
+            else:
+                sekeh_corrected = numeric_sekeh
+        except (ValueError, TypeError):
+            # اگر مقدار ورودی عدد نبود، همان 'N/A' باقی می‌ماند
+            sekeh_corrected = sekeh_raw
+        # --- پایان منطق هوشمند ---
+
         price_items.append(f"💵 دلار: <code>{format_number(prices.get('usd', 'N/A'))}</code>")
         price_items.append(f"🇪🇺 یورو: <code>{format_number(prices.get('eur', 'N/A'))}</code>")
-        price_items.append(f"🪙 سکه: <code>{format_number(prices.get('sekeh', 'N/A'))}</code>")
+        price_items.append(f"🪙 سکه: <code>{format_number(sekeh_corrected)}</code>")
         price_items.append(f"🌟 طلا ۱۸: <code>{format_number(prices.get('18ayar', 'N/A'))}</code>")
         price_items.append(f"₮ تتر: <code>{format_number(prices.get('usdt', 'N/A'))}</code>")
         
@@ -90,7 +106,13 @@ def send_final_message(sentence, prices, proxies_list):
     keyboard = [proxy_buttons, channel_buttons]
     reply_markup = json.dumps({"inline_keyboard": keyboard})
 
-    message_text = (f"{sentence}\n\n{price_section}\n\n👇 برای اتصال، یکی از سرورهای زیر را انتخاب کنید:")
+    message_text = (
+        f"{sentence}\n\n"
+        f"{price_section}\n"
+        f"📅 {time_str}\n\n"
+        f"👇 برای اتصال، یکی از سرورهای زیر را انتخاب کنید:"
+    )
+    
     payload = {'chat_id': CHAT_ID, 'text': message_text, 'parse_mode': 'HTML', 'reply_markup': reply_markup}
     
     requests.post(TELEGRAM_API_URL, data=payload, timeout=10)
@@ -98,6 +120,11 @@ def send_final_message(sentence, prices, proxies_list):
 
 
 if __name__ == "__main__":
+    now_utc = jdatetime.datetime.now(jdatetime.timezone.utc)
+    tehran_timezone = jdatetime.timezone(jdatetime.timedelta(hours=3, minutes=30))
+    now_tehran = now_utc.astimezone(tehran_timezone)
+    current_time_str = now_tehran.strftime("%Y/%m/%d - %H:%M")
+
     sentences = fetch_list_from_file(SENTENCES_FILE)
     chosen_sentence = random.choice(sentences) if sentences else "موفقیت، نتیجه‌ی تلاش‌های کوچک و روزمره است."
 
@@ -109,7 +136,7 @@ if __name__ == "__main__":
         
         if len(all_proxies) >= 3:
             selected_proxies = random.sample(all_proxies, 3)
-            send_final_message(chosen_sentence, current_prices, selected_proxies)
+            send_final_message(chosen_sentence, current_prices, selected_proxies, current_time_str)
         else:
             print("Not enough proxies found to send.")
     except Exception as e:
