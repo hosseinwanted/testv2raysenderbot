@@ -3,19 +3,19 @@ import os
 import random
 import json
 import jdatetime
-from datetime import datetime, timezone, timedelta # وارد کردن کتابخانه استاندارد زمان
+from datetime import datetime, timezone, timedelta
 
 # --- تنظیمات اصلی ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
 PROXIES_URL = "https://raw.githubusercontent.com/MhdiTaheri/ProxyCollector/main/proxy.txt"
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-SENTENCES_FILE = "sentences.txt"
 
-# --- خواندن امن کلیدهای API ناوید از سکرت گیت‌هاب ---
+# --- فایل‌های موضوعی ---
+CATEGORY_FILES = ["motivational.txt", "quotes.txt", "facts.txt"]
+
 api_keys_str = os.environ.get("NAVASAN_API_KEYS", "")
 API_KEYS = [key.strip() for key in api_keys_str.split('\n') if key.strip()]
-
 PRICE_API_URL = "http://api.navasan.tech/latest/?api_key={}"
 
 # !!! مهم: لینک کانال‌های خود را اینجا وارد کنید !!!
@@ -117,25 +117,25 @@ def send_final_message(sentence, prices, proxies_list, time_str):
 
 
 if __name__ == "__main__":
-    # --- بخش اصلاح شده برای مدیریت زمان ---
-    # ۱. گرفتن زمان فعلی به وقت جهانی (UTC) با استفاده از کتابخانه استاندارد
-    now_utc = datetime.now(timezone.utc)
-    
-    # ۲. تعریف منطقه زمانی تهران (۳:۳۰+ از UTC)
+    # --- بخش اصلاح شده برای مدیریت زمان و انتخاب موضوع ---
+    # ۱. گرفتن زمان فعلی به وقت تهران
     tehran_tz = timezone(timedelta(hours=3, minutes=30))
-    
-    # ۳. تبدیل زمان UTC به زمان تهران
-    now_tehran_gregorian = now_utc.astimezone(tehran_tz)
-    
-    # ۴. تبدیل زمان میلادی تهران به زمان جلالی (شمسی)
-    now_jalali = jdatetime.datetime.fromgregorian(datetime=now_tehran_gregorian)
-    
-    # ۵. فرمت کردن تاریخ و ساعت شمسی برای نمایش
-    current_time_str = now_jalali.strftime("%Y/%m/%d - %H:%M")
-    # --- پایان بخش اصلاح شده ---
+    now_tehran = datetime.now(tehran_tz)
 
-    sentences = fetch_list_from_file(SENTENCES_FILE)
+    # ۲. تبدیل زمان میلادی به جلالی برای نمایش
+    now_jalali = jdatetime.datetime.fromgregorian(datetime=now_tehran)
+    current_time_str = now_jalali.strftime("%Y/%m/%d - %H:%M")
+    
+    # ۳. انتخاب فایل موضوع بر اساس ساعت فعلی
+    current_hour = now_tehran.hour
+    file_index = current_hour % len(CATEGORY_FILES)
+    chosen_file = CATEGORY_FILES[file_index]
+    print(f"Current hour is {current_hour}. Chosen category file: {chosen_file}")
+
+    # ۴. خواندن جمله تصادفی از فایل انتخاب شده
+    sentences = fetch_list_from_file(chosen_file)
     chosen_sentence = random.choice(sentences) if sentences else "موفقیت، نتیجه‌ی تلاش‌های کوچک و روزمره است."
+    # --- پایان بخش اصلاح شده ---
 
     current_prices = get_prices_from_api()
 
@@ -145,7 +145,6 @@ if __name__ == "__main__":
         
         if len(all_proxies) >= 3:
             selected_proxies = random.sample(all_proxies, 3)
-            # ارسال زمان فرمت‌شده به تابع ارسال پیام
             send_final_message(chosen_sentence, current_prices, selected_proxies, current_time_str)
         else:
             print("Not enough proxies found to send.")
