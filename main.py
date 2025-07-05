@@ -3,6 +3,7 @@ import os
 import random
 import json
 import jdatetime
+from datetime import datetime, timezone, timedelta # وارد کردن کتابخانه استاندارد زمان
 
 # --- تنظیمات اصلی ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -72,20 +73,16 @@ def send_final_message(sentence, prices, proxies_list, time_str):
     """پیام نهایی و ترکیبی را با قالب هوشمند و مقاوم ارسال می‌کند."""
     price_items = []
     if prices:
-        # --- بخش کلیدی: منطق هوشمند برای اصلاح قیمت سکه ---
         sekeh_raw = prices.get('sekeh', 'N/A')
         sekeh_corrected = sekeh_raw
         try:
             numeric_sekeh = int(float(str(sekeh_raw).replace(',', '')))
-            # اگر قیمت سکه کمتر از یک میلیون تومان بود، آن را در 1000 ضرب کن
             if 0 < numeric_sekeh < 1000000:
                 sekeh_corrected = numeric_sekeh * 1000
             else:
                 sekeh_corrected = numeric_sekeh
         except (ValueError, TypeError):
-            # اگر مقدار ورودی عدد نبود، همان 'N/A' باقی می‌ماند
             sekeh_corrected = sekeh_raw
-        # --- پایان منطق هوشمند ---
 
         price_items.append(f"💵 دلار: <code>{format_number(prices.get('usd', 'N/A'))}</code>")
         price_items.append(f"🇪🇺 یورو: <code>{format_number(prices.get('eur', 'N/A'))}</code>")
@@ -120,10 +117,22 @@ def send_final_message(sentence, prices, proxies_list, time_str):
 
 
 if __name__ == "__main__":
-    now_utc = jdatetime.datetime.now(jdatetime.timezone.utc)
-    tehran_timezone = jdatetime.timezone(jdatetime.timedelta(hours=3, minutes=30))
-    now_tehran = now_utc.astimezone(tehran_timezone)
-    current_time_str = now_tehran.strftime("%Y/%m/%d - %H:%M")
+    # --- بخش اصلاح شده برای مدیریت زمان ---
+    # ۱. گرفتن زمان فعلی به وقت جهانی (UTC) با استفاده از کتابخانه استاندارد
+    now_utc = datetime.now(timezone.utc)
+    
+    # ۲. تعریف منطقه زمانی تهران (۳:۳۰+ از UTC)
+    tehran_tz = timezone(timedelta(hours=3, minutes=30))
+    
+    # ۳. تبدیل زمان UTC به زمان تهران
+    now_tehran_gregorian = now_utc.astimezone(tehran_tz)
+    
+    # ۴. تبدیل زمان میلادی تهران به زمان جلالی (شمسی)
+    now_jalali = jdatetime.datetime.fromgregorian(datetime=now_tehran_gregorian)
+    
+    # ۵. فرمت کردن تاریخ و ساعت شمسی برای نمایش
+    current_time_str = now_jalali.strftime("%Y/%m/%d - %H:%M")
+    # --- پایان بخش اصلاح شده ---
 
     sentences = fetch_list_from_file(SENTENCES_FILE)
     chosen_sentence = random.choice(sentences) if sentences else "موفقیت، نتیجه‌ی تلاش‌های کوچک و روزمره است."
@@ -136,6 +145,7 @@ if __name__ == "__main__":
         
         if len(all_proxies) >= 3:
             selected_proxies = random.sample(all_proxies, 3)
+            # ارسال زمان فرمت‌شده به تابع ارسال پیام
             send_final_message(chosen_sentence, current_prices, selected_proxies, current_time_str)
         else:
             print("Not enough proxies found to send.")
