@@ -1,31 +1,45 @@
-name: Send API Data to Telegram
+# نام نمایشی گردش کار در تب Actions
+name: Send Price and Proxy Data to Telegram
 
+# تعریف زمان‌بندی و تریگرهای اجرا
 on:
   schedule:
-    # اجرا در ابتدای هر ساعت
+    # اجرا در ابتدای هر ساعت (مثلا 10:00, 11:00, 12:00)
+    # برای تغییر زمان، این خط را ویرایش کنید
     - cron: '0 * * * *'
+    
+  # این گزینه به شما اجازه می‌دهد که گردش کار را به صورت دستی هم از تب Actions اجرا کنید
   workflow_dispatch:
 
+# تعریف کارهایی که باید انجام شود
 jobs:
+  # تعریف یک کار واحد به نام build
   build:
+    # استفاده از آخرین نسخه اوبونتو به عنوان سیستم‌عامل اجراکننده
     runs-on: ubuntu-latest
 
+    # مراحل اجرای کار
     steps:
+      # مرحله اول: دریافت کدها از مخزن
+      # این مرحله ضروری است تا اسکریپت به فایل sentences.txt دسترسی داشته باشد
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # مرحله دوم: راه‌اندازی محیط پایتون
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
+      # مرحله سوم: نصب کتابخانه‌های مورد نیاز پایتون
       - name: Install dependencies
         run: pip install requests
 
+      # مرحله چهارم: اجرای اسکریپت اصلی پایتون
       - name: Run script
         env:
+          # ارسال سکرت‌ها به اسکریپت به عنوان متغیرهای محیطی
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-          BRS_API_KEY: ${{ secrets.BRS_API_KEY }} # خواندن سکرت صحیح
-
+          NAVASAN_API_KEYS: ${{ secrets.NAVASAN_API_KEYS }}
         run: python main.py
